@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from sklearn.model_selection import train_test_split
 
 def preprocess_data(loan_data):
     """Preprocess the loan data"""
@@ -63,9 +64,8 @@ def preprocess_data(loan_data):
     
     return loan_data
 
-# Train test Split
-from sklearn.model_selection import train_test_split
 
+# Train test Split
 def split_data(loan_data, test_size=0.2, random_state=42, target_col='good_bad'):
     """
     Split data into train and test sets
@@ -85,6 +85,28 @@ def split_data(loan_data, test_size=0.2, random_state=42, target_col='good_bad')
     return train_test_split(X, y, test_size=test_size, random_state=random_state)
 
 # TODO: Calculate WoE (Weight of Evidence) and IV (Information Value) of discrete variables
-# def woe_discrete(df, discrete_variable_name, good_bad_variable_df):
+def woe_discrete(df, discrete_variable_name, good_bad_variable_df):
+    df_temp = pd.concat([df[discrete_variable_name], good_bad_variable_df], axis=1)
+    df_temp1 = df_temp.groupby(discrete_variable_name).agg(
+        n_obs=pd.NamedAgg(column="good_bad", aggfunc="count"),
+        prop_good_bad=pd.NamedAgg(column="good_bad", aggfunc="mean"),
+        n_good=pd.NamedAgg(column="good_bad", aggfunc="sum")
+    ).reset_index()
+    df_temp1["n_bad"] = df_temp1["n_obs"] - df_temp1["n_good"]
+    df_temp1["prop_good"] = df_temp1["n_good"] / sum(df_temp1["n_good"])
+    df_temp1["prop_bad"] = df_temp1["n_bad"] / sum(df_temp1["n_bad"])
+    # df_temp.good_bad.value_counts()
+
+    # Calculating Weight of Evidence
+    df_temp1["WoE"] = np.log(df_temp1["prop_good"] / df_temp1["prop_bad"])
+    df_temp1 = df_temp1.sort_values("WoE", ascending=True).reset_index(drop=True)
+    df_temp1["diff_WoE"] = df_temp1["WoE"].diff().abs()
+
+    # Calculating Information Value (IV)
+    df_temp1["IV"] = (df_temp1["prop_good"] - df_temp1["prop_bad"]) * df_temp1["WoE"]
+    df_temp1["IV"] = df_temp1["IV"].sum()
+
+    return df_temp1
+
     
 # TODO: Calculate WoE (Weight of Evidence) and IV (Information Value) of continuous variables
